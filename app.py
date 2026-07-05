@@ -119,8 +119,11 @@ else:
 st.caption(f"Ultima leitura: {latest.name.strftime('%d/%m/%Y %H:%M:%S')}")
 
 # ---------- Graficos ----------
-st.subheader("Temperatura e Umidade")
-st.line_chart(df[["Temperatura", "Umidade"]])
+st.subheader("Temperatura (C)")
+st.line_chart(df[["Temperatura"]])
+
+st.subheader("Umidade (%)")
+st.line_chart(df[["Umidade"]])
 
 if "Ruido_dB" in df.columns and df["Ruido_dB"].notna().any():
     st.subheader("Nivel de ruido (dB)")
