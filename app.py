@@ -86,9 +86,10 @@ def fetch_data(channel_id: str, api_key: str, results: int) -> pd.DataFrame:
     df = df.rename(columns={
         "field1": "Temperatura",
         "field2": "Umidade",
-        "field3": "Ruido",
+        "field3": "Ruido_RMS",
+        "field4": "Ruido_dB",
     })
-    for col in ["Temperatura", "Umidade", "Ruido"]:
+    for col in ["Temperatura", "Umidade", "Ruido_RMS", "Ruido_dB"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -110,7 +111,10 @@ latest = df.iloc[-1]
 col1, col2, col3 = st.columns(3)
 col1.metric("Temperatura", f"{latest['Temperatura']:.1f} C" if pd.notna(latest['Temperatura']) else "--")
 col2.metric("Umidade", f"{latest['Umidade']:.1f} %" if pd.notna(latest['Umidade']) else "--")
-col3.metric("Nivel de ruido (RMS)", f"{latest['Ruido']:.0f}" if pd.notna(latest['Ruido']) else "--")
+if "Ruido_dB" in df.columns and pd.notna(latest.get("Ruido_dB")):
+    col3.metric("Nivel de ruido", f"{latest['Ruido_dB']:.1f} dB")
+else:
+    col3.metric("Nivel de ruido (RMS)", f"{latest['Ruido_RMS']:.0f}" if pd.notna(latest['Ruido_RMS']) else "--")
 
 st.caption(f"Ultima leitura: {latest.name.strftime('%d/%m/%Y %H:%M:%S')}")
 
@@ -118,8 +122,13 @@ st.caption(f"Ultima leitura: {latest.name.strftime('%d/%m/%Y %H:%M:%S')}")
 st.subheader("Temperatura e Umidade")
 st.line_chart(df[["Temperatura", "Umidade"]])
 
-st.subheader("Nivel de ruido (RMS)")
-st.line_chart(df[["Ruido"]])
+if "Ruido_dB" in df.columns and df["Ruido_dB"].notna().any():
+    st.subheader("Nivel de ruido (dB)")
+    st.line_chart(df[["Ruido_dB"]])
+
+if "Ruido_RMS" in df.columns and df["Ruido_RMS"].notna().any():
+    with st.expander("Ver nivel de ruido em RMS bruto (historico anterior a calibracao em dB)"):
+        st.line_chart(df[["Ruido_RMS"]])
 
 with st.expander("Ver dados brutos"):
     st.dataframe(df)
