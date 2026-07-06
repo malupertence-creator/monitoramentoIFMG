@@ -59,7 +59,17 @@ channel_id = st.sidebar.text_input("Channel ID do ThingSpeak", value="3422157")
 read_api_key = st.sidebar.text_input(
     "Read API Key (deixe em branco se o canal for publico)", value="", type="password"
 )
-num_results = st.sidebar.slider("Quantidade de leituras exibidas", 10, 500, 100)
+
+st.sidebar.divider()
+modo = st.sidebar.radio("Periodo a visualizar", ["Ultimas leituras", "Um dia especifico"])
+
+if modo == "Ultimas leituras":
+    num_results = st.sidebar.slider("Quantidade de leituras exibidas", 10, 8000, 100)
+    data_escolhida = None
+else:
+    num_results = 8000  # maximo permitido por requisicao no ThingSpeak
+    data_escolhida = st.sidebar.date_input("Escolha o dia")
+
 refresh_seconds = st.sidebar.slider("Atualizar a cada (segundos)", 5, 60, 20)
 
 # Atualiza a pagina sozinha no intervalo escolhido
@@ -67,11 +77,15 @@ st_autorefresh(interval=refresh_seconds * 1000, key="auto_refresh")
 
 
 @st.cache_data(ttl=5)
-def fetch_data(channel_id: str, api_key: str, results: int) -> pd.DataFrame:
+def fetch_data(channel_id: str, api_key: str, results: int, start=None, end=None) -> pd.DataFrame:
     url = f"https://api.thingspeak.com/channels/{channel_id}/feeds.json"
     params = {"results": results}
     if api_key:
         params["api_key"] = api_key
+    if start is not None:
+        params["start"] = start
+    if end is not None:
+        params["end"] = end
 
     response = requests.get(url, params=params, timeout=10)
     response.raise_for_status()
@@ -97,7 +111,12 @@ def fetch_data(channel_id: str, api_key: str, results: int) -> pd.DataFrame:
 
 
 try:
-    df = fetch_data(channel_id, read_api_key, num_results)
+    if data_escolhida is not None:
+        start_str = data_escolhida.strftime("%Y-%m-%d") + " 00:00:00"
+        end_str = data_escolhida.strftime("%Y-%m-%d") + " 23:59:59"
+        df = fetch_data(channel_id, read_api_key, num_results, start=start_str, end=end_str)
+    else:
+        df = fetch_data(channel_id, read_api_key, num_results)
 except Exception as e:
     st.error(f"Nao foi possivel buscar os dados do ThingSpeak: {e}")
     st.stop()
