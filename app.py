@@ -188,10 +188,9 @@ def graficos_parametro(titulo, coluna):
             st.line_chart(df_b[[coluna]].rename(columns={coluna: "Sala B"}), color=[COR_SALA_B])
         with col_c:
             st.caption("Comparacao")
-            comp = pd.DataFrame({
-                "Sala A": df_a[coluna] if coluna in df_a.columns else pd.Series(dtype=float),
-                "Sala B": df_b[coluna],
-            })
+            serie_a = df_a[coluna].resample("1min").mean() if coluna in df_a.columns else pd.Series(dtype=float)
+            serie_b = df_b[coluna].resample("1min").mean()
+            comp = pd.DataFrame({"Sala A": serie_a, "Sala B": serie_b})
             st.line_chart(comp, color=[COR_SALA_A, COR_SALA_B])
     else:
         # So uma montagem disponivel - mostra grafico unico, sem erro
