@@ -170,22 +170,33 @@ if latest_b is not None:
     col6.metric("Nivel de ruido", f"{latest_b['Ruido_dB']:.1f} dB" if pd.notna(latest_b.get('Ruido_dB')) else "--")
     st.caption(f"Ultima leitura Sala B: {latest_b.name.strftime('%d/%m/%Y %H:%M:%S')}")
 
-# ---------- Graficos comparativos ----------
-def grafico_comparativo(titulo, coluna):
+# ---------- Graficos por parametro ----------
+def graficos_parametro(titulo, coluna):
     st.subheader(titulo)
+
     if latest_b is not None and coluna in df_b.columns:
-        comp = pd.DataFrame({
-            "Sala A": df_a[coluna] if coluna in df_a.columns else pd.Series(dtype=float),
-            "Sala B": df_b[coluna] if coluna in df_b.columns else pd.Series(dtype=float),
-        })
-        st.line_chart(comp)
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            st.caption("Sala A")
+            st.line_chart(df_a[[coluna]].rename(columns={coluna: "Sala A"}))
+        with col_b:
+            st.caption("Sala B")
+            st.line_chart(df_b[[coluna]].rename(columns={coluna: "Sala B"}))
+        with col_c:
+            st.caption("Comparacao")
+            comp = pd.DataFrame({
+                "Sala A": df_a[coluna] if coluna in df_a.columns else pd.Series(dtype=float),
+                "Sala B": df_b[coluna],
+            })
+            st.line_chart(comp)
     else:
+        # So uma montagem disponivel - mostra grafico unico, sem erro
         st.line_chart(df_a[[coluna]].rename(columns={coluna: "Sala A"}))
 
 
-grafico_comparativo("Temperatura (C)", "Temperatura")
-grafico_comparativo("Umidade (%)", "Umidade")
-grafico_comparativo("Nivel de ruido (dB)", "Ruido_dB")
+graficos_parametro("Temperatura (C)", "Temperatura")
+graficos_parametro("Umidade (%)", "Umidade")
+graficos_parametro("Nivel de ruido (dB)", "Ruido_dB")
 
 with st.expander("Ver dados brutos - Sala A"):
     st.dataframe(df_a)
