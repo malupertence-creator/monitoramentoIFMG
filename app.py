@@ -170,6 +170,10 @@ if latest_b is not None:
     col6.metric("Nivel de ruido", f"{latest_b['Ruido_dB']:.1f} dB" if pd.notna(latest_b.get('Ruido_dB')) else "--")
     st.caption(f"Ultima leitura Sala B: {latest_b.name.strftime('%d/%m/%Y %H:%M:%S')}")
 
+# ---------- Cores fixas por sala ----------
+COR_SALA_A = "#3B82F6"  # azul
+COR_SALA_B = "#EF4444"  # vermelho
+
 # ---------- Graficos por parametro ----------
 def graficos_parametro(titulo, coluna):
     st.subheader(titulo)
@@ -178,20 +182,20 @@ def graficos_parametro(titulo, coluna):
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             st.caption("Sala A")
-            st.line_chart(df_a[[coluna]].rename(columns={coluna: "Sala A"}))
+            st.line_chart(df_a[[coluna]].rename(columns={coluna: "Sala A"}), color=[COR_SALA_A])
         with col_b:
             st.caption("Sala B")
-            st.line_chart(df_b[[coluna]].rename(columns={coluna: "Sala B"}))
+            st.line_chart(df_b[[coluna]].rename(columns={coluna: "Sala B"}), color=[COR_SALA_B])
         with col_c:
             st.caption("Comparacao")
             comp = pd.DataFrame({
                 "Sala A": df_a[coluna] if coluna in df_a.columns else pd.Series(dtype=float),
                 "Sala B": df_b[coluna],
             })
-            st.line_chart(comp)
+            st.line_chart(comp, color=[COR_SALA_A, COR_SALA_B])
     else:
         # So uma montagem disponivel - mostra grafico unico, sem erro
-        st.line_chart(df_a[[coluna]].rename(columns={coluna: "Sala A"}))
+        st.line_chart(df_a[[coluna]].rename(columns={coluna: "Sala A"}), color=[COR_SALA_A])
 
 
 graficos_parametro("Temperatura (C)", "Temperatura")
