@@ -55,10 +55,23 @@ with col_title:
 
 st.sidebar.image("logo.png", use_container_width=True)
 st.sidebar.header("Configuracoes")
-channel_id = st.sidebar.text_input("Channel ID do ThingSpeak", value="3422157")
-read_api_key = st.sidebar.text_input(
-    "Read API Key (deixe em branco se o canal for publico)", value="", type="password"
+
+comparar = st.sidebar.checkbox("Comparar duas montagens (Sala A vs Sala B)", value=True)
+
+st.sidebar.subheader("Sala A")
+channel_id_a = st.sidebar.text_input("Channel ID - Sala A", value="3422157")
+read_api_key_a = st.sidebar.text_input(
+    "Read API Key - Sala A (em branco se publico)", value="", type="password", key="key_a"
 )
+
+channel_id_b = ""
+read_api_key_b = ""
+if comparar:
+    st.sidebar.subheader("Sala B")
+    channel_id_b = st.sidebar.text_input("Channel ID - Sala B", value="3426255")
+    read_api_key_b = st.sidebar.text_input(
+        "Read API Key - Sala B (em branco se publico)", value="", type="password", key="key_b"
+    )
 
 st.sidebar.divider()
 modo = st.sidebar.radio("Periodo a visualizar", ["Ultimas leituras", "Um dia especifico"])
@@ -110,47 +123,72 @@ def fetch_data(channel_id: str, api_key: str, results: int, start=None, end=None
     return df.set_index("created_at")
 
 
-try:
+def buscar(channel_id, api_key):
     if data_escolhida is not None:
         start_str = data_escolhida.strftime("%Y-%m-%d") + " 00:00:00"
         end_str = data_escolhida.strftime("%Y-%m-%d") + " 23:59:59"
-        df = fetch_data(channel_id, read_api_key, num_results, start=start_str, end=end_str)
-    else:
-        df = fetch_data(channel_id, read_api_key, num_results)
+        return fetch_data(channel_id, api_key, num_results, start=start_str, end=end_str)
+    return fetch_data(channel_id, api_key, num_results)
+
+
+try:
+    df_a = buscar(channel_id_a, read_api_key_a)
 except Exception as e:
-    st.error(f"Nao foi possivel buscar os dados do ThingSpeak: {e}")
+    st.error(f"Nao foi possivel buscar os dados da Sala A: {e}")
     st.stop()
 
-if df.empty:
-    st.warning("Nenhum dado encontrado ainda. Verifique o Channel ID ou espere o ESP32 enviar leituras.")
+df_b = pd.DataFrame()
+if comparar:
+    if not channel_id_b:
+        st.warning("Preencha o Channel ID da Sala B na barra lateral para comparar.")
+    else:
+        try:
+            df_b = buscar(channel_id_b, read_api_key_b)
+        except Exception as e:
+            st.error(f"Nao foi possivel buscar os dados da Sala B: {e}")
+
+if df_a.empty:
+    st.warning("Nenhum dado encontrado ainda para a Sala A. Verifique o Channel ID ou espere o ESP32 enviar leituras.")
     st.stop()
 
 # ---------- Cards com os valores mais recentes ----------
-latest = df.iloc[-1]
+latest_a = df_a.iloc[-1]
+latest_b = df_b.iloc[-1] if not df_b.empty else None
+
+st.subheader("Sala A")
 col1, col2, col3 = st.columns(3)
-col1.metric("Temperatura", f"{latest['Temperatura']:.1f} C" if pd.notna(latest['Temperatura']) else "--")
-col2.metric("Umidade", f"{latest['Umidade']:.1f} %" if pd.notna(latest['Umidade']) else "--")
-if "Ruido_dB" in df.columns and pd.notna(latest.get("Ruido_dB")):
-    col3.metric("Nivel de ruido", f"{latest['Ruido_dB']:.1f} dB")
-else:
-    col3.metric("Nivel de ruido (RMS)", f"{latest['Ruido_RMS']:.0f}" if pd.notna(latest['Ruido_RMS']) else "--")
+col1.metric("Temperatura", f"{latest_a['Temperatura']:.1f} C" if pd.notna(latest_a['Temperatura']) else "--")
+col2.metric("Umidade", f"{latest_a['Umidade']:.1f} %" if pd.notna(latest_a['Umidade']) else "--")
+col3.metric("Nivel de ruido", f"{latest_a['Ruido_dB']:.1f} dB" if pd.notna(latest_a.get('Ruido_dB')) else "--")
+st.caption(f"Ultima leitura Sala A: {latest_a.name.strftime('%d/%m/%Y %H:%M:%S')}")
 
-st.caption(f"Ultima leitura: {latest.name.strftime('%d/%m/%Y %H:%M:%S')}")
+if latest_b is not None:
+    st.subheader("Sala B")
+    col4, col5, col6 = st.columns(3)
+    col4.metric("Temperatura", f"{latest_b['Temperatura']:.1f} C" if pd.notna(latest_b['Temperatura']) else "--")
+    col5.metric("Umidade", f"{latest_b['Umidade']:.1f} %" if pd.notna(latest_b['Umidade']) else "--")
+    col6.metric("Nivel de ruido", f"{latest_b['Ruido_dB']:.1f} dB" if pd.notna(latest_b.get('Ruido_dB')) else "--")
+    st.caption(f"Ultima leitura Sala B: {latest_b.name.strftime('%d/%m/%Y %H:%M:%S')}")
 
-# ---------- Graficos ----------
-st.subheader("Temperatura (C)")
-st.line_chart(df[["Temperatura"]])
+# ---------- Graficos comparativos ----------
+def grafico_comparativo(titulo, coluna):
+    st.subheader(titulo)
+    if latest_b is not None and coluna in df_b.columns:
+        comp = pd.DataFrame({
+            "Sala A": df_a[coluna] if coluna in df_a.columns else pd.Series(dtype=float),
+            "Sala B": df_b[coluna] if coluna in df_b.columns else pd.Series(dtype=float),
+        })
+        st.line_chart(comp)
+    else:
+        st.line_chart(df_a[[coluna]].rename(columns={coluna: "Sala A"}))
 
-st.subheader("Umidade (%)")
-st.line_chart(df[["Umidade"]])
 
-if "Ruido_dB" in df.columns and df["Ruido_dB"].notna().any():
-    st.subheader("Nivel de ruido (dB)")
-    st.line_chart(df[["Ruido_dB"]])
+grafico_comparativo("Temperatura (C)", "Temperatura")
+grafico_comparativo("Umidade (%)", "Umidade")
+grafico_comparativo("Nivel de ruido (dB)", "Ruido_dB")
 
-if "Ruido_RMS" in df.columns and df["Ruido_RMS"].notna().any():
-    with st.expander("Ver nivel de ruido em RMS bruto (historico anterior a calibracao em dB)"):
-        st.line_chart(df[["Ruido_RMS"]])
-
-with st.expander("Ver dados brutos"):
-    st.dataframe(df)
+with st.expander("Ver dados brutos - Sala A"):
+    st.dataframe(df_a)
+if latest_b is not None:
+    with st.expander("Ver dados brutos - Sala B"):
+        st.dataframe(df_b)
